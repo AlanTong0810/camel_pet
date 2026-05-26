@@ -19,6 +19,7 @@ type Persisted = {
   focusCoachCooldownSeconds: number;
   focusCategories: string[];
   distractionCategories: string[];
+  petTheme: string;
 };
 
 const DEFAULTS: Persisted = {
@@ -37,6 +38,7 @@ const DEFAULTS: Persisted = {
   focusCoachCooldownSeconds: 900,
   focusCategories: ["coding", "working", "reading", "learning", "design", "meeting"],
   distractionCategories: ["video", "gaming", "social_media", "browsing"],
+  petTheme: "Sigrika",
 };
 
 function load(): Persisted {
@@ -67,6 +69,7 @@ export const useConfigStore = defineStore("config", () => {
   const focusCoachCooldownSeconds = ref(initial.focusCoachCooldownSeconds);
   const focusCategories = ref<string[]>([...initial.focusCategories]);
   const distractionCategories = ref<string[]>([...initial.distractionCategories]);
+  const petTheme = ref(initial.petTheme);
 
   // Server is the source of truth after handshake; these mirror that.
   const serverHasApiKey = ref(false);
@@ -89,6 +92,7 @@ export const useConfigStore = defineStore("config", () => {
       focusCoachCooldownSeconds: focusCoachCooldownSeconds.value,
       focusCategories: [...focusCategories.value],
       distractionCategories: [...distractionCategories.value],
+      petTheme: petTheme.value,
     };
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(snap));
@@ -114,6 +118,7 @@ export const useConfigStore = defineStore("config", () => {
       focusCoachCooldownSeconds,
       focusCategories,
       distractionCategories,
+      petTheme,
     ],
     persist,
     { deep: true },
@@ -135,6 +140,7 @@ export const useConfigStore = defineStore("config", () => {
     focusCoachCooldownSeconds,
     focusCategories,
     distractionCategories,
+    petTheme,
     serverHasApiKey,
     serverModel,
   };

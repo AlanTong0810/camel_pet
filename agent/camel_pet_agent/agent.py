@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Callable, Optional
 
 from camel.agents import ChatAgent
@@ -20,6 +21,25 @@ from .personality import SYSTEM_PROMPT
 log = logging.getLogger("camel-pet.agent")
 
 
+def load_theme_prompt(theme: str) -> str:
+    theme_norm = (theme or "default").lower()
+    if theme_norm == "default":
+        return SYSTEM_PROMPT
+
+    root_dir = Path(__file__).parent.parent.parent
+    prompt_file = root_dir / "pet_sources" / theme_norm / "prompt.txt"
+    try:
+        if prompt_file.exists():
+            return prompt_file.read_text(encoding="utf-8").strip()
+    except Exception as e:
+        log.warning("Failed to load prompt from %s: %s", prompt_file, e)
+
+    if theme_norm == "sigrika":
+        return "Your name is Sigrika, a student in Startorch Academy. You are a member of the Roy clan."
+    return SYSTEM_PROMPT
+
+
+
 class CamelPetAgent:
     def __init__(
         self,
@@ -29,19 +49,46 @@ class CamelPetAgent:
         store: Optional[ChatStore] = None,
         platform: str = "anthropic",
         url: Optional[str] = None,
+        pet_theme: str = "Sigrika",
     ):
         platform_norm = (platform or "anthropic").lower()
 
         if platform_norm == "minmax":
             base_url = url or os.environ.get("ANTHROPIC_BASE_URL")
-            key = api_key or os.environ.get("MINIMAX_API_KEY")
+            key = api_key or os.environ.get("MINIMAX_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
             if not key:
                 raise RuntimeError(
-                    "ANTHROPIC_API_KEY not set. Export it or put it in agent/.env"
+                    "API key not set. Export it or put it in agent/.env"
                 )
             model = ModelFactory.create(
                 model_platform=ModelPlatformType.ANTHROPIC,
                 model_type=model_name or ModelType.MINIMAX_M2_7,
+                api_key=key,
+                url=base_url,
+            )
+        elif platform_norm == "openai_compatible":
+            base_url = url or os.environ.get("OPENAI_COMPATIBLE_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
+            key = api_key or os.environ.get("OPENAI_COMPATIBLE_API_KEY") or os.environ.get("OPENAI_API_KEY")
+            if not key:
+                raise RuntimeError(
+                    "OpenAI compatible API key not set. Export it or put it in agent/.env"
+                )
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.OPENAI,
+                model_type=model_name,
+                api_key=key,
+                url=base_url,
+            )
+        elif platform_norm == "anthropic":
+            base_url = url or os.environ.get("ANTHROPIC_BASE_URL")
+            key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+            if not key:
+                raise RuntimeError(
+                    "Anthropic API key not set. Export it or put it in agent/.env"
+                )
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.ANTHROPIC,
+                model_type=model_name,
                 api_key=key,
                 url=base_url,
             )
@@ -50,11 +97,12 @@ class CamelPetAgent:
                 f"unknown platform '{platform}': expected 'anthropic', 'minimax', or 'openai_compatible'"
             )
 
+        system_prompt = load_theme_prompt(pet_theme)
         system_msg = BaseMessage(
             role_name="Camel",
             role_type=RoleType.ASSISTANT,
             meta_dict={},
-            content=SYSTEM_PROMPT,
+            content=system_prompt,
         )
 
         kwargs: dict = {

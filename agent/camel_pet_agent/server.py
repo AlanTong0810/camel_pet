@@ -68,6 +68,7 @@ class Runtime:
         self.focus_coach_cooldown_seconds = 900
         self.focus_categories: list[str] = list(DEFAULT_FOCUS)
         self.distraction_categories: list[str] = list(DEFAULT_DISTRACTION)
+        self.pet_theme = "Sigrika"
         # Vision model — must support image inputs (separate from chat model)
         self.vision_platform = os.environ.get("CAMEL_PET_VISION_PLATFORM", "minmax").lower()
         self.vision_model = os.environ.get("CAMEL_PET_VISION_MODEL", "MiniMax-M2.7")
@@ -92,6 +93,7 @@ class Runtime:
             store=self.store,
             platform=self.platform,
             url=self.base_url,
+            pet_theme=self.pet_theme,
         )
 
     def rebuild_agent(self) -> None:
@@ -376,6 +378,11 @@ def _apply_config(msg: dict[str, Any]) -> tuple[bool, str | None]:
             RT.monitor_interval_seconds = new_interval
             if RT.monitor:
                 RT.monitor.set_interval(new_interval)
+    if "pet_theme" in msg:
+        new_theme = str(msg["pet_theme"])
+        if new_theme != RT.pet_theme:
+            RT.pet_theme = new_theme
+            changed = True
 
     # ── focus coach config ────────────────────────────────────
     coach_reconf: dict = {}
@@ -459,6 +466,7 @@ async def ws_endpoint(ws: WebSocket):
             "focus_coach_cooldown_seconds": RT.focus_coach_cooldown_seconds,
             "focus_categories": RT.focus_categories,
             "distraction_categories": RT.distraction_categories,
+            "pet_theme": RT.pet_theme,
         },
     )
 
@@ -503,6 +511,7 @@ async def ws_endpoint(ws: WebSocket):
                             "focus_coach_cooldown_seconds": RT.focus_coach_cooldown_seconds,
                             "focus_categories": RT.focus_categories,
                             "distraction_categories": RT.distraction_categories,
+                            "pet_theme": RT.pet_theme,
                         },
                     )
 

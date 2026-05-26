@@ -36,6 +36,7 @@ A desktop pet that is also a [CAMEL-AI](https://github.com/camel-ai/camel) `Chat
   - `get_activity_summary()` — reports today's activity breakdown, same data the dashboard shows.
 - **Model switching at runtime** — Haiku 4.5 (fast), Sonnet 4.6 (balanced), Opus 4.7 (smart), or a custom model name. Platforms: Anthropic, MiniMax (Anthropic-compatible), OpenAI-compatible. API key can come from `agent/.env` or be pasted into Settings.
 - **Personality** — baked-in system prompt makes the camel terse, curious, lightly sarcastic, occasionally desert-referential. Editable in `agent/camel_pet_agent/personality.py`.
+- **Pet theme switching** — toggle between the original `Default` camel emoji and custom spritesheets like `Sigrika` at runtime. Each theme dynamically loads its own system prompt from `pet_sources/<theme>/prompt.txt` to fully customize the pet's name, backstory, and voice.
 - **Streaming** — tokens arrive over a local WebSocket and stream into the current speech cloud in real time; when a cloud fills up, the next page pops in.
 - **Local-first, no telemetry** — the sidecar binds to `127.0.0.1` only, nothing leaves your machine except the LLM call itself.
 

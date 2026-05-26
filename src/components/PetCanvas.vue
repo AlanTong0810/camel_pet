@@ -1,5 +1,9 @@
 <script setup lang="ts">
-defineProps<{ mood: "idle" | "talking" | "happy"; connected: boolean }>();
+import { ref, computed } from "vue";
+import { useConfigStore } from "../stores/config";
+
+const props = defineProps<{ mood: "idle" | "talking" | "happy"; connected: boolean }>();
+const cfg = useConfigStore();
 const emit = defineEmits<{
   (e: "leftClick"): void;
   (e: "rightClick"): void;
@@ -20,6 +24,50 @@ let lastY = 0;
 let movedPastThreshold = false;
 
 let pendingSingleClick: number | null = null;
+
+const dragDirection = ref<"none" | "left" | "right">("none");
+let dragDebounceTimer: number | null = null;
+let proposedDirection: "none" | "left" | "right" = "none";
+
+function setDragDirection(dir: "none" | "left" | "right") {
+  if (dir === "none") {
+    if (dragDebounceTimer !== null) {
+      clearTimeout(dragDebounceTimer);
+      dragDebounceTimer = null;
+    }
+    proposedDirection = "none";
+    dragDirection.value = "none";
+    return;
+  }
+  
+  if (dragDirection.value === dir) {
+    if (dragDebounceTimer !== null) {
+      clearTimeout(dragDebounceTimer);
+      dragDebounceTimer = null;
+    }
+    proposedDirection = dir;
+    return;
+  }
+
+  if (proposedDirection !== dir) {
+    proposedDirection = dir;
+    if (dragDebounceTimer !== null) clearTimeout(dragDebounceTimer);
+    dragDebounceTimer = window.setTimeout(() => {
+      dragDirection.value = proposedDirection;
+      dragDebounceTimer = null;
+    }, 80); // Debounce to prevent jittering
+  }
+}
+
+const spriteState = computed(() => {
+  if (dragDirection.value === "left") return { row: 2, frames: 8 };
+  if (dragDirection.value === "right") return { row: 1, frames: 8 };
+  if (props.mood === "happy") return { row: 3, frames: 4 };
+  if (props.mood === "talking") return { row: 4, frames: 5 };
+  return { row: 0, frames: 6 }; // idle
+});
+
+const animationKey = computed(() => `${spriteState.value.row}-${spriteState.value.frames}`);
 
 function clearPendingSingle() {
   if (pendingSingleClick !== null) {
@@ -51,6 +99,10 @@ function onPointerMove(e: PointerEvent) {
     const dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
+    
+    if (dx > 0) setDragDirection("right");
+    else if (dx < 0) setDragDirection("left");
+
     if (dx !== 0 || dy !== 0) emit("dragMove", dx, dy);
   }
 }
@@ -65,6 +117,7 @@ function onPointerUp(e: PointerEvent) {
   if (dragging) {
     dragging = false;
     movedPastThreshold = false;
+    setDragDirection("none");
     emit("dragEnd");
     return;
   }
@@ -83,6 +136,7 @@ function onPointerCancel() {
   if (dragging) {
     dragging = false;
     movedPastThreshold = false;
+    setDragDirection("none");
     emit("dragEnd");
   }
 }
@@ -97,14 +151,31 @@ function onContextMenu(e: MouseEvent) {
 <template>
   <div
     class="pet"
-    :class="{ talking: mood === 'talking', happy: mood === 'happy' }"
+    :class="{
+      talking: cfg.petTheme === 'Default' && mood === 'talking',
+      happy: cfg.petTheme === 'Default' && mood === 'happy'
+    }"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
     @contextmenu="onContextMenu"
   >
-    <span class="camel">🐫</span>
+    <template v-if="cfg.petTheme === 'Default'">
+      <span class="camel">🐫</span>
+    </template>
+    <template v-else>
+      <div 
+        class="sprite" 
+        :key="animationKey"
+        :style="{
+          '--current-row': spriteState.row,
+          '--current-frame-count': spriteState.frames,
+          'animation-duration': (spriteState.frames * 0.18) + 's',
+          'animation-timing-function': 'steps(' + spriteState.frames + ')'
+        }"
+      ></div>
+    </template>
     <span class="dot" :class="{ on: connected }" />
   </div>
 </template>
@@ -128,24 +199,19 @@ function onContextMenu(e: MouseEvent) {
 .pet:active {
   cursor: grabbing;
 }
-.pet.talking {
-  animation: walking 0.7s ease-in-out infinite;
-}
-.pet.talking .camel {
-  animation: step-squash 0.7s ease-in-out infinite;
-}
-.pet.happy {
-  animation: happy 0.45s ease-in-out 4;
-}
 
-.camel {
-  font-size: 96px;
-  line-height: 1;
+.sprite {
+  width: 192px;
+  height: 208px;
+  background-image: url('../assets/sigrika-spritesheet.webp');
+  background-size: 1536px 1872px;
+  background-repeat: no-repeat;
+  background-position-y: calc(var(--current-row) * -208px);
+  animation-name: play-sprite;
+  animation-iteration-count: infinite;
+  transform: scale(0.65);
   pointer-events: none;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
-          drop-shadow(0 0 2px rgba(0, 0, 0, 0.25));
-  transform-origin: 50% 80%;
-  animation: breathe 3.2s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
 .dot {
@@ -170,10 +236,37 @@ function onContextMenu(e: MouseEvent) {
   50%      { transform: translateY(0) rotate(1.5deg); }
   75%      { transform: translateY(-2px) rotate(-0.5deg); }
 }
+
+@keyframes play-sprite {
+  from { background-position-x: 0; }
+  to { background-position-x: calc(-1 * var(--current-frame-count) * 192px); }
+}
+
+.pet.talking {
+  animation: walking 0.7s ease-in-out infinite;
+}
+.pet.talking .camel {
+  animation: step-squash 0.7s ease-in-out infinite;
+}
+.pet.happy {
+  animation: happy 0.45s ease-in-out 4;
+}
+
+.camel {
+  font-size: 96px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35))
+          drop-shadow(0 0 2px rgba(0, 0, 0, 0.25));
+  transform-origin: 50% 80%;
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.05); }
 }
+
 @keyframes walking {
   0%   { transform: translateX(0)    translateY(0)    rotate(-2deg); }
   25%  { transform: translateX(-3px) translateY(-5px) rotate(-5deg); }
@@ -181,14 +274,17 @@ function onContextMenu(e: MouseEvent) {
   75%  { transform: translateX(3px)  translateY(-5px) rotate(2deg); }
   100% { transform: translateX(0)    translateY(0)    rotate(-2deg); }
 }
+
 @keyframes step-squash {
   0%, 50%, 100% { transform: scale(1, 1); }
   25%           { transform: scale(1.04, 0.96); }
   75%           { transform: scale(0.97, 1.03); }
 }
+
 @keyframes happy {
   0%, 100% { transform: rotate(0deg) scale(1); }
   25%      { transform: rotate(-10deg) scale(1.06); }
   75%      { transform: rotate(10deg) scale(1.06); }
 }
 </style>
+

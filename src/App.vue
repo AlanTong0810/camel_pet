@@ -463,6 +463,7 @@ function pushPendingConfig() {
     focus_coach_cooldown_seconds: cfg.focusCoachCooldownSeconds,
     focus_categories: [...cfg.focusCategories],
     distraction_categories: [...cfg.distractionCategories],
+    pet_theme: cfg.petTheme,
   });
 }
 

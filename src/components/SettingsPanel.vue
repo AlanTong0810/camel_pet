@@ -11,6 +11,7 @@ const emit = defineEmits<{
 const cfg = useConfigStore();
 const showKey = ref(false);
 const dirty = ref(false);
+const confirmWipe = ref(false);
 
 function markDirty() {
   dirty.value = true;
@@ -22,9 +23,16 @@ function apply() {
 }
 
 function clearHistory() {
-  if (confirm("Wipe the camel's memory? This deletes all stored chat history.")) {
-    emit("clearHistory");
-  }
+  confirmWipe.value = true;
+}
+
+function executeWipe() {
+  emit("clearHistory");
+  confirmWipe.value = false;
+}
+
+function cancelWipe() {
+  confirmWipe.value = false;
 }
 
 const MODELS = [
@@ -32,6 +40,7 @@ const MODELS = [
   { value: "claude-haiku-4-5", label: "Claude Haiku 4.5 (fast)" },
   { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (balanced)" },
   { value: "claude-opus-4-7", label: "Claude Opus 4.7 (smart)" },
+  { value: "deepseek-chat", label: "DeepSeek-Chat"}, 
 ];
 
 const PLATFORMS = [
@@ -114,6 +123,14 @@ const coachSummary = computed(() => {
           @input="markDirty"
           style="margin-top: 4px"
         />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Pet Theme</span>
+        <select v-model="cfg.petTheme" @change="markDirty">
+          <option value="Default">Default (Camel)</option>
+          <option value="Sigrika">Sigrika</option>
+        </select>
       </label>
 
       <label class="field">
@@ -254,9 +271,16 @@ const coachSummary = computed(() => {
     </div>
 
     <div class="footer">
-      <button class="danger" @click="clearHistory">Wipe memory</button>
-      <div class="spacer" />
-      <button :disabled="!dirty" @click="apply">{{ dirty ? "Apply" : "Saved" }}</button>
+      <template v-if="confirmWipe">
+        <span class="confirm-text">Wipe memory?</span>
+        <button class="danger confirm-btn" @click="executeWipe">Yes</button>
+        <button class="confirm-btn cancel" @click="cancelWipe">No</button>
+      </template>
+      <template v-else>
+        <button class="danger" @click="clearHistory">Wipe memory</button>
+        <div class="spacer" />
+        <button :disabled="!dirty" @click="apply">{{ dirty ? "Apply" : "Saved" }}</button>
+      </template>
     </div>
   </div>
 </template>
@@ -421,5 +445,19 @@ input:focus {
 }
 .footer .danger {
   background: #c0392b;
+}
+.confirm-text {
+  font-size: 12px;
+  color: #c0392b;
+  font-weight: bold;
+}
+.confirm-btn {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.confirm-btn.cancel {
+  background: #f3ede3 !important;
+  color: #333 !important;
+  border: 1px solid #ddd !important;
 }
 </style>
